@@ -1,2 +1,2 @@
 # mag
-edit the read me.
+A method is used for identifying the PCDs fertility of igneous rocks.
