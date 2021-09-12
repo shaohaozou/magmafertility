@@ -1,0 +1,101 @@
+import pandas as pd
+import numpy as np
+
+#import keras as k
+from keras import regularizers,initializers
+from keras.models import Sequential
+from keras.layers import Dense, Dropout, Activation,BatchNormalization
+from keras.wrappers.scikit_learn import KerasClassifier
+from keras.optimizers import Adam, SGD, Adagrad, RMSprop
+from keras.utils import np_utils
+
+from sklearn import metrics
+
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import cross_val_score
+from sklearn.preprocessing import LabelEncoder
+
+from sklearn.preprocessing import StandardScaler
+
+import matplotlib.pyplot as plt
+
+%matplotlib inline
+%config InlineBackend.figure_format = 'svg'
+
+df = pd.read_csv("zircon_whole_dataset_ML.csv", encoding='cp1252')
+
+from pyrolite.geochem.norm import get_reference_composition
+
+
+# using a centred log-ratio transformation
+X_ML = df.drop(["Feature",'AGE(MA)'], axis=1)
+
+#X = StandardScaler().fit_transform(X_ML)
+X = X_ML.pyrocomp.CLR()
+
+X = pd.DataFrame(X)
+X.columns = X_ML.columns.values
+
+y = df['Feature']
+uniques, coded_id = np.unique(y, return_inverse=True)
+y_code = np_utils.to_categorical(coded_id)
+
+X_train, X_test, Y_train, Y_test = train_test_split(X, y_code, test_size = 0.2, shuffle= True,stratify = y, random_state=0)
+
+from keras.callbacks import EarlyStopping
+
+lr = 0.0001
+
+model = Sequential()
+
+model.add(Dense(20, activation='relu', kernel_regularizer=regularizers.l2(0.001),
+                kernel_initializer=initializers.he_normal(seed=None),
+                input_dim=X_train.shape[1]))
+model.add(Dropout(0.001))
+#model.add(Dense(100,activation='tanh'))
+model.add(Dense(50,activation='relu', kernel_regularizer=regularizers.l2(0.001),
+                kernel_initializer=initializers.he_normal(seed=None)))
+model.add(Dropout(0.001))
+#model.add(Dense(100,activation='relu', kernel_initializer=initializers.he_normal(seed=None)))
+#model.add(Dropout(0.001))
+model.add(Dense(25,activation='relu', kernel_regularizer=regularizers.l2(0.001),
+                kernel_initializer=initializers.he_normal(seed=None)))
+model.add(Dropout(0.001))
+model.add(Dense(2, activation='softmax'))
+
+
+#RMS = RMSprop(lr=lr)
+#sgd = SGD(lr=lr, decay=lr/100, momentum=0.9)
+#adag = Adagrad(lr=0.0001, epsilon=1e-5)
+adam = Adam(lr=lr)
+
+model.compile(loss='binary_crossentropy',optimizer=adam, metrics=['accuracy'])
+#model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+#model.compile(Adam(lr=0.01), loss='binary_crossentropy', metrics=['accuracy'])
+early_stopping = EarlyStopping(monitor='val_loss', patience=5, verbose=1,mode='auto')
+
+
+history = model.fit(X_train, Y_train, epochs=300, verbose=1, batch_size=20,
+                    validation_data=(X_test, Y_test), shuffle = False,callbacks=[early_stopping])
+
+scores = model.evaluate(X_test, Y_test, verbose=1)
+print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+
+epochs = np.arange(0, len(history.history["loss"]))
+
+fig,ax = plt.subplots(1, 2, figsize=(8, 3))
+
+ax[0].plot(epochs, history.history['loss'],'r', label = 'train_loss')
+ax[0].plot(epochs, history.history['val_loss'],'b', label = 'test_loss')
+ax[0].legend(loc='upper right')
+
+ax[1].plot(epochs, history.history['accuracy'],'r', label = 'train_acc')
+ax[1].plot(epochs, history.history['val_accuracy'],'blue', label = 'test_acc')
+#ax[1].set_ylim(0,1)
+ax[1].legend(loc='upper left')
+
+plt.savefig("mymodel.pdf", bbox_inches = "tight", transparent = True)
+
+model.save('zricon_total-20210730.h5')
+

@@ -1,0 +1,46 @@
+mport pandas as pd
+import numpy as np
+import seaborn as sns
+from scipy import stats
+import math
+import statsmodels.api as sm
+
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_val_score
+from sklearn import metrics
+
+import joblib
+
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+
+from sklearn.preprocessing import StandardScaler
+
+%matplotlib inline
+%config InlineBackend.figure_format = 'svg'
+
+import warnings
+warnings.filterwarnings("ignore")
+
+df = pd.read_csv("zircon_whole_dataset_ML.csv", encoding='cp1252')
+
+from pyrolite.geochem.norm import get_reference_composition
+# using a centred log-ratio transformation
+X_ML = df.drop(["Feature",'AGE(MA)'], axis=1)
+
+#X = StandardScaler().fit_transform(X_ML)
+X = X_ML.pyrocomp.CLR()
+X = pd.DataFrame(X)
+X.columns = X_ML.columns.values
+
+y = df['Feature']
+
+x_training_set, x_test_set, y_training_set, y_test_set = train_test_split(X, y,test_size = 0.2, random_state=0)
+rfc = RandomForestClassifier(n_estimators=100, max_depth=None, min_samples_split=2, random_state=0)
+model_RF = rfc.fit(x_training_set, y_training_set)
+
+joblib.dump(rfc, "RandomForest0730.joblib")
+
